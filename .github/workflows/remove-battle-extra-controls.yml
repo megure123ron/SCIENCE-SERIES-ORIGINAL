@@ -1,0 +1,105 @@
+
+name: Remove Battle Research Extra Controls
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch all three games
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              "physica/assets/index-CKYAsxQ2.js",
+              "chemica/assets/index-BXyANL5z.js",
+              "biotica/assets/index-e84-tVCE.js",
+          ]
+
+          popup_toggle = 'o.jsxs("label",{className:"proposal-toggle",children:[o.jsx("input",{type:"checkbox",checked:b.suggestResearch,onChange:z=>x(w=>({...w,suggestResearch:z.target.checked}))}),"毎ターン提案する（設定でも変更できます）"]})'
+
+          battle_bgm = 'o.jsxs("button",{onClick:()=>x(z=>({...z,bgm:!z.bgm})),children:["BGM ",b.bgm?"ON":"OFF"]})'
+
+          for filename in files:
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8")
+
+              if source.count(popup_toggle) != 1:
+                  raise RuntimeError(f"ポップアップの対象が1つではありません: {filename}")
+
+              if source.count(battle_bgm) != 1:
+                  raise RuntimeError(f"バトルBGMボタンの対象が1つではありません: {filename}")
+
+              source = source.replace(popup_toggle, "", 1)
+              source = source.replace(battle_bgm, "", 1)
+
+              if "毎ターン提案する（設定でも変更できます）" in source:
+                  raise RuntimeError(f"ポップアップ項目が残っています: {filename}")
+
+              if battle_bgm in source:
+                  raise RuntimeError(f"バトルBGMボタンが残っています: {filename}")
+
+              if "research-proposal" not in source or "考察する" not in source:
+                  raise RuntimeError(f"考察の提案機能が失われています: {filename}")
+
+              if 'className:"icon-button header-audio"' not in source:
+                  raise RuntimeError(f"ヘッダーBGM操作が見つかりません: {filename}")
+
+              path.write_text(source, encoding="utf-8")
+              print(f"修正完了: {filename}")
+          PY
+
+      - name: Validate JavaScript
+        run: |
+          for file in \
+            physica/assets/index-CKYAsxQ2.js \
+            chemica/assets/index-BXyANL5z.js \
+            biotica/assets/index-e84-tVCE.js
+          do
+            node --check "$file"
+          done
+
+      - name: Verify exact changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              "physica/assets/index-CKYAsxQ2.js",
+              "chemica/assets/index-BXyANL5z.js",
+              "biotica/assets/index-e84-tVCE.js",
+          ]
+
+          for filename in files:
+              s = Path(filename).read_text(encoding="utf-8")
+              assert "毎ターン提案する（設定でも変更できます）" not in s
+              assert "research-proposal" in s
+              assert "考察する" in s
+              assert 'className:"icon-button header-audio"' in s
+              assert 'className:"battle-settings-row"' in s
+              print(f"検証OK: {filename}")
+          PY
+
+      - name: Commit to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            physica/assets/index-CKYAsxQ2.js \
+            chemica/assets/index-BXyANL5z.js \
+            biotica/assets/index-e84-tVCE.js
+          git diff --cached --check
+          git commit -m "Remove extra battle research controls"
+          git push origin main
