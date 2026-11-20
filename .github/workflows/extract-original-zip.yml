@@ -19,13 +19,15 @@ jobs:
           mkdir -p /tmp/website
           unzip -q SCIENCE-SERIES-v1.2-web.zip -d /tmp/website
 
-          INDEX=$(find /tmp/website -name index.html -type f | head -n 1)
+          INDEX=$(find /tmp/website -type f -name index.html -printf '%d\t%p\n' | sort -n | head -n 1 | cut -f2-)
+
           if [ -z "$INDEX" ]; then
             echo "index.html not found in ZIP"
             exit 1
           fi
 
           ROOT=$(dirname "$INDEX")
+          echo "Using original top page: $INDEX"
           cp -a "$ROOT"/. .
 
       - name: Commit extracted files
@@ -36,6 +38,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Extract original SCIENCE SERIES website"
+            git commit -m "Restore original SCIENCE SERIES website"
             git push
           fi
