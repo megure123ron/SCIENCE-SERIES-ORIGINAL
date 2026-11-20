@@ -1,0 +1,54 @@
+
+name: Fix CHEMICA and BIOTICA Icons
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace game header icons
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          targets = [
+              "chemica/assets/index-BXyANL5z.js",
+              "biotica/assets/index-e84-tVCE.js"
+          ]
+
+          old = 'o.jsx("span",{className:"brand-mark",children:o.jsx(vt,{field:J.symbol})})'
+          new = 'o.jsx("span",{className:"brand-mark",children:o.jsx("img",{src:"./icon-192.png",alt:""})})'
+
+          for name in targets:
+              p = Path(name)
+              s = p.read_text()
+              if old not in s:
+                  raise RuntimeError(f"置換対象が見つかりません: {name}")
+              p.write_text(s.replace(old, new, 1))
+
+          for name in [
+              "chemica/assets/index-D85opa-J.css",
+              "biotica/assets/index-D85opa-J.css"
+          ]:
+              p = Path(name)
+              s = p.read_text()
+              s += "\n.brand-mark{border:0;background:transparent;overflow:hidden}.brand-mark img{width:100%;height:100%;object-fit:cover;border-radius:10px}\n"
+              p.write_text(s)
+
+          print("CHEMICA・BIOTICAのアイコン修正完了")
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add chemica biotica
+          git commit -m "Match game header icons with series icons"
+          git push
