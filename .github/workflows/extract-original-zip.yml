@@ -1,0 +1,41 @@
+
+name: Extract Original Website
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract website ZIP
+        run: |
+          mkdir -p /tmp/website
+          unzip -q SCIENCE-SERIES-v1.2-web.zip -d /tmp/website
+
+          INDEX=$(find /tmp/website -name index.html -type f | head -n 1)
+          if [ -z "$INDEX" ]; then
+            echo "index.html not found in ZIP"
+            exit 1
+          fi
+
+          ROOT=$(dirname "$INDEX")
+          cp -a "$ROOT"/. .
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Extract original SCIENCE SERIES website"
+            git push
+          fi
