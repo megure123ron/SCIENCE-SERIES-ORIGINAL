@@ -1,0 +1,67 @@
+
+name: Add ABOUT Buttons to All Games
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  add-about:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Add ABOUT links
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          targets = {
+              "physica/assets/index-CKYAsxQ2.js": "physica",
+              "chemica/assets/index-BXyANL5z.js": "chemica",
+              "biotica/assets/index-e84-tVCE.js": "biotica",
+          }
+
+          old = 'o.jsx("button",{className:"secondary",onClick:()=>c(!0),children:[o.jsx(he,{name:"install"}),"ホーム画面に追加"]})'
+
+          for filename, game in targets.items():
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8")
+
+              link = f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",children:"ABOUT"}})'
+
+              if link in source:
+                  continue
+
+              if source.count(old) != 1:
+                  raise RuntimeError(f"対象が見つかりません: {filename}")
+
+              source = source.replace(old, old + "," + link, 1)
+              path.write_text(source, encoding="utf-8")
+
+          PY
+
+      - name: Validate JavaScript
+        run: |
+          for file in \
+            physica/assets/index-CKYAsxQ2.js \
+            chemica/assets/index-BXyANL5z.js \
+            biotica/assets/index-e84-tVCE.js
+          do
+            node --check "$file"
+          done
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add physica chemica biotica
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "Add ABOUT buttons to all games"
+            git push origin main
+          fi
