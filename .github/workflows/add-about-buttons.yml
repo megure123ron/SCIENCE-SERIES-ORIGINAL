@@ -21,13 +21,14 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           targets = {
               "physica/assets/index-CKYAsxQ2.js": "physica",
               "chemica/assets/index-BXyANL5z.js": "chemica",
               "biotica/assets/index-e84-tVCE.js": "biotica",
           }
+
+          old = 'o.jsxs("button",{className:"secondary",onClick:()=>c(!0),children:[o.jsx(he,{name:"install"}),"ホーム画面に追加"]})'
 
           for filename, game in targets.items():
               path = Path(filename)
@@ -37,29 +38,23 @@ jobs:
 
               source = path.read_text(encoding="utf-8")
 
-              about = f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",children:"ABOUT"}})'
+              link = f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",children:"ABOUT"}})'
 
-              if about in source:
-                  print(f"{game}: ABOUTボタンは追加済み")
+              if link in source:
+                  print(f"{game}: ABOUT追加済み")
                   continue
 
-              # 「ホーム画面に追加」を含むボタン要素を探す
-              pattern = r'o\.jsx\("button",\{className:"secondary",onClick:.*?children:\[.*?"ホーム画面に追加"\]\}\)'
+              count = source.count(old)
 
-              matches = list(re.finditer(pattern, source))
+              if count != 1:
+                  raise RuntimeError(
+                      f"{game}: 設定ボタンの一致数が {count} です。変更せず停止します。"
+                  )
 
-              if len(matches) != 1:
-                  print(f"{game}: ボタン候補数 = {len(matches)}")
-                  pos = source.find("ホーム画面に追加")
-                  if pos >= 0:
-                      print(source[max(0, pos-400):pos+400])
-                  raise RuntimeError(f"{game}: 対象ボタンを特定できません")
-
-              match = matches[0]
-              source = source[:match.end()] + "," + about + source[match.end():]
-
+              source = source.replace(old, old + "," + link, 1)
               path.write_text(source, encoding="utf-8")
-              print(f"{game}: ABOUTボタンを追加しました")
+
+              print(f"{game}: ABOUT追加成功")
 
           PY
 
