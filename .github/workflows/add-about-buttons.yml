@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: main
@@ -41,28 +41,25 @@ jobs:
                   f'children:"ABOUT"}})'
               )
 
-              if source.count(link) > 0:
-                  print(f"{game}: ABOUT追加済み")
+              if link in source:
+                  print(f"{game}: 追加済み")
                   continue
 
               count = source.count(old)
 
               if count != 1:
                   raise RuntimeError(
-                      f"{game}: 設定ボタンの一致数が{count}です。変更を中止します。"
+                      f"{game}: 対象ボタンが{count}個。変更を中止します"
                   )
 
               source = source.replace(old, old + "," + link, 1)
-
-              if source.count(link) != 1:
-                  raise RuntimeError(f"{game}: ABOUT追加の検証に失敗")
-
               path.write_text(source, encoding="utf-8")
-              print(f"{game}: ABOUT追加成功")
+
+              print(f"{game}: ABOUT追加完了")
 
           PY
 
-      - name: Validate JavaScript
+      - name: Check JavaScript
         run: |
           for file in \
             physica/assets/index-CKYAsxQ2.js \
@@ -72,7 +69,7 @@ jobs:
             node --check "$file"
           done
 
-      - name: Verify changes
+      - name: Verify ABOUT links
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -85,14 +82,16 @@ jobs:
 
           for filename, game in targets.items():
               source = Path(filename).read_text(encoding="utf-8")
-              link = f'about.html?from={game}'
+              link = f"../about.html?from={game}"
 
-              assert source.count(link) == 1, f"{game}: ABOUTリンク検証失敗"
+              if source.count(link) != 1:
+                  raise RuntimeError(f"{game}: リンク確認失敗")
 
-              print(f"{game}: 検証OK")
+              print(f"{game}: OK")
+
           PY
 
-      - name: Commit changes
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -108,6 +107,4 @@ jobs:
             git commit -m "Add ABOUT buttons to all games"
             git pull --rebase origin main
             git push origin main
-          else
-            echo "変更はありません"
           fi
