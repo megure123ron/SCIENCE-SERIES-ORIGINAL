@@ -18,7 +18,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Add ABOUT buttons
+      - name: Insert ABOUT buttons
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -29,37 +29,40 @@ jobs:
               "biotica/assets/index-e84-tVCE.js": "biotica",
           }
 
+          old = (
+              'o.jsxs("button",{className:"secondary",'
+              'onClick:()=>c(!0),'
+              'children:[o.jsx(he,{name:"install"}),"ホーム画面に追加"]})'
+          )
+
           for filename, game in targets.items():
               path = Path(filename)
               source = path.read_text(encoding="utf-8")
 
-              marker = (
-                  '"ホーム画面に追加"]})]}),'
-                  'o.jsxs("section",{className:"panel settings-panel"'
-              )
+              url = f"../about.html?from={game}"
 
-              link = (
-                  f'"ホーム画面に追加"]}),'
-                  f'o.jsx("a",{{className:"secondary",'
-                  f'href:"../about.html?from={game}",'
-                  f'children:"ABOUT"}})]}}),'
-                  f'o.jsxs("section",{{className:"panel settings-panel"'
-              )
-
-              if f"../about.html?from={game}" in source:
-                  print(f"{game}: 追加済み")
+              if url in source:
+                  print(f"{game}: already added")
                   continue
 
-              count = source.count(marker)
+              count = source.count(old)
+              print(f"{game}: target count = {count}")
 
               if count != 1:
                   raise RuntimeError(
-                      f"{game}: 目印が{count}個です。変更を中止します"
+                      f"{game}: expected exactly 1 target, found {count}"
                   )
 
-              source = source.replace(marker, link, 1)
+              new = (
+                  old
+                  + ',o.jsx("a",{className:"secondary",'
+                  + f'href:"{url}",'
+                  + 'children:"ABOUT"})'
+              )
+
+              source = source.replace(old, new, 1)
               path.write_text(source, encoding="utf-8")
-              print(f"{game}: ABOUT追加完了")
+              print(f"{game}: ABOUT inserted")
 
           PY
 
@@ -69,7 +72,7 @@ jobs:
           node --check chemica/assets/index-BXyANL5z.js
           node --check biotica/assets/index-e84-tVCE.js
 
-      - name: Verify all links
+      - name: Verify links
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -82,16 +85,16 @@ jobs:
 
           for filename, game in targets.items():
               source = Path(filename).read_text(encoding="utf-8")
-              link = f"../about.html?from={game}"
+              url = f"../about.html?from={game}"
 
-              if source.count(link) != 1:
-                  raise RuntimeError(f"{game}: ABOUTリンク確認失敗")
+              if source.count(url) != 1:
+                  raise RuntimeError(f"{game}: link verification failed")
 
-              print(f"{game}: OK")
+              print(f"{game}: verified")
 
           PY
 
-      - name: Commit changes
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
