@@ -1,11 +1,11 @@
-const CACHE='science-biology-v12-1795056769156';
+const CACHE='science-biology-v13-1795056769156-20261123-3';
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
     caches
       .open(CACHE)
       .then((c) =>
-        c.addAll(["./","./THIRD_PARTY_NOTICES.txt","./assets/index-D85opa-J.css","./assets/index-e84-tVCE.js","./icon-180.png","./icon-192.png","./icon-512.png","./icon-maskable.png","./icon.svg","./index.html","./manifest.webmanifest"]),
+        c.addAll(["./","./THIRD_PARTY_NOTICES.txt","./assets/index-D85opa-J.css","./assets/index-e84-tVCE.js?v=20261123-3","./icon-180.png","./icon-192.png","./icon-512.png","./icon-maskable.png","./icon.svg","./index.html","./manifest.webmanifest"]),
       ),
   );
 });

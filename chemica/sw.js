@@ -1,11 +1,11 @@
-const CACHE='science-chemistry-v12-1795056768016';
+const CACHE='science-chemistry-v13-1795056768016-20261123-3';
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
     caches
       .open(CACHE)
       .then((c) =>
-        c.addAll(["./","./THIRD_PARTY_NOTICES.txt","./assets/index-BXyANL5z.js","./assets/index-D85opa-J.css","./icon-180.png","./icon-192.png","./icon-512.png","./icon-maskable.png","./icon.svg","./index.html","./manifest.webmanifest"]),
+        c.addAll(["./","./THIRD_PARTY_NOTICES.txt","./assets/index-BXyANL5z.js?v=20261123-3","./assets/index-D85opa-J.css","./icon-180.png","./icon-192.png","./icon-512.png","./icon-maskable.png","./icon.svg","./index.html","./manifest.webmanifest"]),
       ),
   );
 });
