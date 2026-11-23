@@ -1,5 +1,5 @@
 
-name: Add ABOUT buttons
+name: Polish settings ABOUT layout
 
 on:
   workflow_dispatch:
@@ -8,9 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  add-about:
+  polish-settings:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,7 +17,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Insert ABOUT buttons
+      - name: Move ABOUT and remove explanation panel
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -29,51 +28,54 @@ jobs:
               "biotica/assets/index-e84-tVCE.js": "biotica",
           }
 
-          old = (
-              'o.jsxs("button",{className:"secondary",'
-              'onClick:()=>c(!0),'
-              'children:[o.jsx(he,{name:"install"}),"ホーム画面に追加"]})'
-          )
-
           for filename, game in targets.items():
               path = Path(filename)
               source = path.read_text(encoding="utf-8")
 
-              url = f"../about.html?from={game}"
-
-              if url in source:
-                  print(f"{game}: already added")
-                  continue
-
-              count = source.count(old)
-              print(f"{game}: target count = {count}")
-
-              if count != 1:
-                  raise RuntimeError(
-                      f"{game}: expected exactly 1 target, found {count}"
-                  )
-
+              old = (
+                  f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",'
+                  'children:"ABOUT"})'
+              )
               new = (
-                  old
-                  + ',o.jsx("a",{className:"secondary",'
-                  + f'href:"{url}",'
-                  + 'children:"ABOUT"})'
+                  f'o.jsx("a",{{className:"secondary",'
+                  'style:{display:"block",marginTop:"8px"},'
+                  f'href:"../about.html?from={game}",children:"ABOUT"}})'
               )
 
-              source = source.replace(old, new, 1)
+              if source.count(new) == 1:
+                  print(f"{game}: ABOUT already adjusted")
+              else:
+                  if source.count(old) != 1:
+                      raise RuntimeError(f"{game}: ABOUT link not found uniquely")
+                  source = source.replace(old, new, 1)
+
+              start_token = (
+                  ',o.jsxs("section",{className:"panel settings-panel",'
+                  'children:[o.jsx("h2",{children:"学習設計と出典"})'
+              )
+              end_token = ']})]})}class B1'
+
+              if source.count(start_token) != 1:
+                  raise RuntimeError(f"{game}: explanation panel start not unique")
+
+              start = source.index(start_token)
+              end = source.find(end_token, start)
+
+              if end < 0:
+                  raise RuntimeError(f"{game}: explanation panel end not found")
+
+              source = source[:start] + source[end + 3:]
               path.write_text(source, encoding="utf-8")
-              print(f"{game}: ABOUT inserted")
+              print(f"{game}: updated")
 
           PY
 
-      - name: Validate JavaScript
+      - name: Validate
         run: |
           node --check physica/assets/index-CKYAsxQ2.js
           node --check chemica/assets/index-BXyANL5z.js
           node --check biotica/assets/index-e84-tVCE.js
 
-      - name: Verify links
-        run: |
           python3 - <<'PY'
           from pathlib import Path
 
@@ -85,13 +87,9 @@ jobs:
 
           for filename, game in targets.items():
               source = Path(filename).read_text(encoding="utf-8")
-              url = f"../about.html?from={game}"
-
-              if source.count(url) != 1:
-                  raise RuntimeError(f"{game}: link verification failed")
-
+              assert source.count(f'about.html?from={game}') == 1
+              assert 'children:"学習設計と出典"' not in source
               print(f"{game}: verified")
-
           PY
 
       - name: Commit and push
@@ -107,7 +105,7 @@ jobs:
           git diff --cached --check
 
           if ! git diff --cached --quiet; then
-            git commit -m "Add ABOUT buttons to all games"
+            git commit -m "Polish settings ABOUT layout"
             git pull --rebase origin main
             git push origin main
           fi
