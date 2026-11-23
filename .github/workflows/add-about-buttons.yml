@@ -12,12 +12,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get repository
+      - name: Checkout latest main
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
-      - name: Add ABOUT buttons
+      - name: Insert ABOUT buttons
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -32,15 +33,15 @@ jobs:
 
           for filename, game in targets.items():
               path = Path(filename)
-
-              if not path.exists():
-                  raise RuntimeError(f"ファイルがありません: {filename}")
-
               source = path.read_text(encoding="utf-8")
 
-              link = f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",children:"ABOUT"}})'
+              link = (
+                  f'o.jsx("a",{{className:"secondary",'
+                  f'href:"../about.html?from={game}",'
+                  f'children:"ABOUT"}})'
+              )
 
-              if link in source:
+              if source.count(link) > 0:
                   print(f"{game}: ABOUT追加済み")
                   continue
 
@@ -48,12 +49,15 @@ jobs:
 
               if count != 1:
                   raise RuntimeError(
-                      f"{game}: 設定ボタンの一致数が {count} です。変更せず停止します。"
+                      f"{game}: 設定ボタンの一致数が{count}です。変更を中止します。"
                   )
 
               source = source.replace(old, old + "," + link, 1)
-              path.write_text(source, encoding="utf-8")
 
+              if source.count(link) != 1:
+                  raise RuntimeError(f"{game}: ABOUT追加の検証に失敗")
+
+              path.write_text(source, encoding="utf-8")
               print(f"{game}: ABOUT追加成功")
 
           PY
@@ -68,16 +72,41 @@ jobs:
             node --check "$file"
           done
 
+      - name: Verify changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          targets = {
+              "physica/assets/index-CKYAsxQ2.js": "physica",
+              "chemica/assets/index-BXyANL5z.js": "chemica",
+              "biotica/assets/index-e84-tVCE.js": "biotica",
+          }
+
+          for filename, game in targets.items():
+              source = Path(filename).read_text(encoding="utf-8")
+              link = f'about.html?from={game}'
+
+              assert source.count(link) == 1, f"{game}: ABOUTリンク検証失敗"
+
+              print(f"{game}: 検証OK")
+          PY
+
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add physica chemica biotica
+          git add \
+            physica/assets/index-CKYAsxQ2.js \
+            chemica/assets/index-BXyANL5z.js \
+            biotica/assets/index-e84-tVCE.js
+
           git diff --cached --check
 
           if ! git diff --cached --quiet; then
             git commit -m "Add ABOUT buttons to all games"
+            git pull --rebase origin main
             git push origin main
           else
             echo "変更はありません"
