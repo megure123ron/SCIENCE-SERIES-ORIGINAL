@@ -10,15 +10,18 @@ permissions:
 jobs:
   add-about:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Get repository
+        uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Add ABOUT links
+      - name: Add ABOUT buttons
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           targets = {
               "physica/assets/index-CKYAsxQ2.js": "physica",
@@ -26,22 +29,37 @@ jobs:
               "biotica/assets/index-e84-tVCE.js": "biotica",
           }
 
-          old = 'o.jsx("button",{className:"secondary",onClick:()=>c(!0),children:[o.jsx(he,{name:"install"}),"ホーム画面に追加"]})'
-
           for filename, game in targets.items():
               path = Path(filename)
+
+              if not path.exists():
+                  raise RuntimeError(f"ファイルがありません: {filename}")
+
               source = path.read_text(encoding="utf-8")
 
-              link = f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",children:"ABOUT"}})'
+              about = f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",children:"ABOUT"}})'
 
-              if link in source:
+              if about in source:
+                  print(f"{game}: ABOUTボタンは追加済み")
                   continue
 
-              if source.count(old) != 1:
-                  raise RuntimeError(f"対象が見つかりません: {filename}")
+              # 「ホーム画面に追加」を含むボタン要素を探す
+              pattern = r'o\.jsx\("button",\{className:"secondary",onClick:.*?children:\[.*?"ホーム画面に追加"\]\}\)'
 
-              source = source.replace(old, old + "," + link, 1)
+              matches = list(re.finditer(pattern, source))
+
+              if len(matches) != 1:
+                  print(f"{game}: ボタン候補数 = {len(matches)}")
+                  pos = source.find("ホーム画面に追加")
+                  if pos >= 0:
+                      print(source[max(0, pos-400):pos+400])
+                  raise RuntimeError(f"{game}: 対象ボタンを特定できません")
+
+              match = matches[0]
+              source = source[:match.end()] + "," + about + source[match.end():]
+
               path.write_text(source, encoding="utf-8")
+              print(f"{game}: ABOUTボタンを追加しました")
 
           PY
 
@@ -59,9 +77,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add physica chemica biotica
           git diff --cached --check
+
           if ! git diff --cached --quiet; then
             git commit -m "Add ABOUT buttons to all games"
             git push origin main
+          else
+            echo "変更はありません"
           fi
