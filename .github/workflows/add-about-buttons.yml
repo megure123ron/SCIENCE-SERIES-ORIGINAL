@@ -1,5 +1,5 @@
 
-name: Polish settings ABOUT layout
+name: Refresh game cache
 
 on:
   workflow_dispatch:
@@ -8,104 +8,91 @@ permissions:
   contents: write
 
 jobs:
-  polish-settings:
+  refresh:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Move ABOUT and remove explanation panel
+      - name: Refresh all game caches
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          targets = {
-              "physica/assets/index-CKYAsxQ2.js": "physica",
-              "chemica/assets/index-BXyANL5z.js": "chemica",
-              "biotica/assets/index-e84-tVCE.js": "biotica",
+          games = {
+              "physica": "index-CKYAsxQ2.js",
+              "chemica": "index-BXyANL5z.js",
+              "biotica": "index-e84-tVCE.js",
           }
 
-          for filename, game in targets.items():
-              path = Path(filename)
-              source = path.read_text(encoding="utf-8")
+          version = "20261123-3"
 
-              old = (
-                  f'o.jsx("a",{{className:"secondary",href:"../about.html?from={game}",'
-                  'children:"ABOUT"})'
+          for game, js in games.items():
+              html = Path(game, "index.html")
+              source = html.read_text(encoding="utf-8")
+              pattern = r'(\./assets/' + re.escape(js) + r')(?:\?v=[^"]*)?'
+              source, count = re.subn(
+                  pattern, lambda m: m.group(1) + "?v=" + version,
+                  source
               )
-              new = (
-                  f'o.jsx("a",{{className:"secondary",'
-                  'style:{display:"block",marginTop:"8px"},'
-                  f'href:"../about.html?from={game}",children:"ABOUT"}})'
+              if count != 1:
+                  raise RuntimeError(f"{game}: HTML script reference count={count}")
+              html.write_text(source, encoding="utf-8")
+
+              sw = Path(game, "sw.js")
+              source = sw.read_text(encoding="utf-8")
+
+              source, count = re.subn(
+                  r"const CACHE='([^']+)-v\d+-([^']+)';",
+                  lambda m: f"const CACHE='{m.group(1)}-v13-{m.group(2)}-{version}';",
+                  source, count=1
               )
+              if count != 1:
+                  raise RuntimeError(f"{game}: cache version not found")
 
-              if source.count(new) == 1:
-                  print(f"{game}: ABOUT already adjusted")
-              else:
-                  if source.count(old) != 1:
-                      raise RuntimeError(f"{game}: ABOUT link not found uniquely")
-                  source = source.replace(old, new, 1)
-
-              start_token = (
-                  ',o.jsxs("section",{className:"panel settings-panel",'
-                  'children:[o.jsx("h2",{children:"学習設計と出典"})'
+              pattern = r'("\./assets/' + re.escape(js) + r')(?:\?v=[^"]*)?(")'
+              source, count = re.subn(
+                  pattern,
+                  lambda m: m.group(1) + "?v=" + version + m.group(2),
+                  source
               )
-              end_token = ']})]})}class B1'
+              if count != 1:
+                  raise RuntimeError(f"{game}: precache JS reference count={count}")
 
-              if source.count(start_token) != 1:
-                  raise RuntimeError(f"{game}: explanation panel start not unique")
-
-              start = source.index(start_token)
-              end = source.find(end_token, start)
-
-              if end < 0:
-                  raise RuntimeError(f"{game}: explanation panel end not found")
-
-              source = source[:start] + source[end + 3:]
-              path.write_text(source, encoding="utf-8")
-              print(f"{game}: updated")
+              sw.write_text(source, encoding="utf-8")
+              print(f"{game}: cache refreshed")
 
           PY
 
       - name: Validate
         run: |
-          node --check physica/assets/index-CKYAsxQ2.js
-          node --check chemica/assets/index-BXyANL5z.js
-          node --check biotica/assets/index-e84-tVCE.js
-
           python3 - <<'PY'
           from pathlib import Path
 
-          targets = {
-              "physica/assets/index-CKYAsxQ2.js": "physica",
-              "chemica/assets/index-BXyANL5z.js": "chemica",
-              "biotica/assets/index-e84-tVCE.js": "biotica",
+          games = {
+              "physica": "index-CKYAsxQ2.js",
+              "chemica": "index-BXyANL5z.js",
+              "biotica": "index-e84-tVCE.js",
           }
 
-          for filename, game in targets.items():
-              source = Path(filename).read_text(encoding="utf-8")
-              assert source.count(f'about.html?from={game}') == 1
-              assert 'children:"学習設計と出典"' not in source
-              print(f"{game}: verified")
+          for game, js in games.items():
+              html = Path(game, "index.html").read_text()
+              sw = Path(game, "sw.js").read_text()
+              assert js + "?v=20261123-3" in html
+              assert js + "?v=20261123-3" in sw
+              assert "-v13-" in sw
+              print(game, "OK")
           PY
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add \
-            physica/assets/index-CKYAsxQ2.js \
-            chemica/assets/index-BXyANL5z.js \
-            biotica/assets/index-e84-tVCE.js
-
+          git add physica/index.html physica/sw.js chemica/index.html chemica/sw.js biotica/index.html biotica/sw.js
           git diff --cached --check
-
-          if ! git diff --cached --quiet; then
-            git commit -m "Polish settings ABOUT layout"
-            git pull --rebase origin main
-            git push origin main
-          fi
+          git commit -m "Refresh game asset cache"
+          git pull --rebase origin main
+          git push origin main
